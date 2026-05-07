@@ -1,12 +1,30 @@
-import React from "react";
-import { Text, View } from "react-native";
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { COLORS } from '../constants/colors';
 
-type Props = { message: string };
+type Props = { message: string; level?: 'warning' | 'danger' };
 
-export default function AlertBox({ message }: Props) {
+export default function AlertBox({ message, level = 'warning' }: Props) {
+  const borderColor = level === 'danger' ? COLORS.danger : COLORS.warning;
+
   return (
-    <View style={{ backgroundColor: "#7F1D1D", padding: 16, borderRadius: 14 }}>
-      <Text style={{ color: "#FCA5A5", fontWeight: "600" }}>{message}</Text>
+    <View style={[styles.box, { borderLeftColor: borderColor }]}>
+      <Text style={styles.text}>{message}</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  box: {
+    width: '100%',
+    backgroundColor: COLORS.surface,
+    borderLeftWidth: 3,
+    borderRadius: 12,
+    padding: 18,
+  },
+  text: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '500',
+  },
+});

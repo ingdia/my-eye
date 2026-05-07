@@ -1,12 +1,17 @@
-import React from "react";
-import { ScrollView } from "react-native";
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { COLORS } from '../constants/colors';
 
-type Props = { children: React.ReactNode };
-
-export default function ScreenContainer({ children }: Props) {
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#0B1020", padding: 20 }}>
-      {children}
-    </ScrollView>
-  );
+export default function ScreenContainer({ children }: { children: React.ReactNode }) {
+  return <View style={styles.container}>{children}</View>;
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+});

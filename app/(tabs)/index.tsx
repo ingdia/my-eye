@@ -1,145 +1,93 @@
-import {
-  AlertTriangle,
-  Camera,
-  MapPin,
-  Settings,
-  Wifi
-} from "lucide-react-native";
-import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
-export default function EMboniApp() {
+import VoiceIndicator from '../../components/VoiceIndicator';
+import { COLORS } from '../../constants/colors';
+import { speak } from '../../services/speechService';
+import { startListening, stopListening } from '../../services/voiceService';
+
+export default function HomeScreen() {
+  const [listening, setListening] = useState(false);
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    speak('E-mboni is ready. Tap once to start. Tap twice to record.');
+  }, []);
+
+  function handleTap() {
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => {
+      if (tapCount.current === 1) handleSingleTap();
+      else handleDoubleTap();
+      tapCount.current = 0;
+    }, 300);
+  }
+
+  function handleSingleTap() {
+    speak('Starting navigation');
+    router.push('/(tabs)/navigation');
+  }
+
+  function handleDoubleTap() {
+    if (listening) {
+      stopListening();
+      setListening(false);
+      speak('Done listening');
+    } else {
+      setListening(true);
+      speak('Listening. Say start to begin.');
+      startListening((result) => {
+        setListening(false);
+        if (result.toLowerCase().includes('start')) handleSingleTap();
+        else speak('Say start to begin, or tap the screen.');
+      });
+    }
+  }
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#0B1020", padding: 20 }}>
-      <Text
-        style={{
-          color: "white",
-          fontSize: 32,
-          fontWeight: "bold",
-          marginTop: 40,
-        }}
-      >
-        E-mboni
-      </Text>
-      <Text style={{ color: "#A0AEC0", fontSize: 16, marginTop: 8 }}>
-        AI wearable assistance for safer mobility
-      </Text>
+    <TouchableOpacity
+      style={styles.screen}
+      onPress={handleTap}
+      activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityLabel="Tap once to start. Tap twice to use voice."
+    >
+      <Text style={styles.appName}>E-mboni</Text>
+      <Text style={styles.tagline}>Your mobility companion</Text>
 
-      <View
-        style={{
-          backgroundColor: "#151B2F",
-          padding: 20,
-          borderRadius: 20,
-          marginTop: 30,
-        }}
-      >
-        <Camera color="white" size={28} />
-        <Text
-          style={{
-            color: "white",
-            fontSize: 22,
-            fontWeight: "600",
-            marginTop: 12,
-          }}
-        >
-          Live Detection
-        </Text>
-        <Text style={{ color: "#94A3B8", marginTop: 8 }}>
-          Connected wearable camera scanning nearby obstacles in real time.
-        </Text>
-        <TouchableOpacity
-          style={{
-            backgroundColor: "#2563EB",
-            padding: 14,
-            borderRadius: 14,
-            marginTop: 18,
-          }}
-        >
-          <Text
-            style={{ color: "white", textAlign: "center", fontWeight: "600" }}
-          >
-            Start Monitoring
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.hint}>tap anywhere to begin</Text>
 
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginTop: 25,
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: "#151B2F",
-            width: "48%",
-            padding: 18,
-            borderRadius: 18,
-          }}
-        >
-          <AlertTriangle color="white" size={24} />
-          <Text style={{ color: "white", marginTop: 10, fontSize: 18 }}>
-            Obstacle Alerts
-          </Text>
-          <Text style={{ color: "#94A3B8", marginTop: 6 }}>
-            Immediate vibration & sound warnings
-          </Text>
-        </View>
-
-        <View
-          style={{
-            backgroundColor: "#151B2F",
-            width: "48%",
-            padding: 18,
-            borderRadius: 18,
-          }}
-        >
-          <Wifi color="white" size={24} />
-          <Text style={{ color: "white", marginTop: 10, fontSize: 18 }}>
-            Device Status
-          </Text>
-          <Text style={{ color: "#94A3B8", marginTop: 6 }}>
-            Wearable connected successfully
-          </Text>
-        </View>
-      </View>
-
-      <View
-        style={{
-          backgroundColor: "#151B2F",
-          padding: 20,
-          borderRadius: 20,
-          marginTop: 25,
-        }}
-      >
-        <MapPin color="white" size={24} />
-        <Text style={{ color: "white", fontSize: 20, marginTop: 10 }}>
-          Navigation Assistance
-        </Text>
-        <Text style={{ color: "#94A3B8", marginTop: 8 }}>
-          Indoor and outdoor path guidance for visually impaired users.
-        </Text>
-      </View>
-
-      <View
-        style={{
-          backgroundColor: "#151B2F",
-          padding: 20,
-          borderRadius: 20,
-          marginTop: 25,
-          marginBottom: 40,
-        }}
-      >
-        <Settings color="white" size={24} />
-        <Text style={{ color: "white", fontSize: 20, marginTop: 10 }}>
-          Accessibility Settings
-        </Text>
-        <Text style={{ color: "#94A3B8", marginTop: 8 }}>
-          Customize alert intensity, voice guidance, and emergency contact
-          options.
-        </Text>
-      </View>
-    </ScrollView>
+      <VoiceIndicator active={listening} />
+    </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    padding: 32,
+  },
+  appName: {
+    color: COLORS.text,
+    fontSize: 42,
+    fontWeight: '600',
+    letterSpacing: 2,
+  },
+  tagline: {
+    color: COLORS.muted,
+    fontSize: 15,
+    marginBottom: 40,
+  },
+  hint: {
+    color: COLORS.muted,
+    fontSize: 14,
+    marginBottom: 32,
+  },
+});
