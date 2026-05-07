@@ -77,16 +77,45 @@ function getDangerLevel(name: string, distance: number, isMoving: boolean): Dang
   return 'safe';
 }
 
-function formatDistance(meters: number): string {
+import { Lang } from '../i18n/translations';
+
+let _lang: Lang = 'en';
+export function setDetectionLanguage(lang: Lang): void { _lang = lang; }
+
+// Kinyarwanda object name translations
+const RW_NAMES: Record<string, string> = {
+  chair:      'intebe',
+  car:        'imodoka',
+  person:     'umuntu',
+  table:      'ameza',
+  dog:        'imbwa',
+  stairs:     'inzitiro',
+  bench:      'intebe ndefu',
+  bus:        'bisi',
+  pole:       'inkingi',
+  bicycle:    'igare',
+  'trash can':'agasanduku',
+  truck:      'kamyo',
+  motorcycle: 'moto',
+  cat:        'injangwe',
+  step:       'intambwe',
+};
+
+function formatDistance(meters: number, lang: Lang): string {
+  if (lang === 'rw') {
+    if (meters < 1) return 'munsi ya metero imwe';
+    if (meters < 10) return `metero ${meters.toFixed(1)}`;
+    return `metero ${Math.round(meters)}`;
+  }
   if (meters < 1) return 'less than 1 meter';
   if (meters < 10) return `${meters.toFixed(1)} meters`;
   return `${Math.round(meters)} meters`;
 }
 
 function buildVoiceSummary(objects: DetectedObject[]): string {
-  if (objects.length === 0) return 'Path is clear';
+  const lang = _lang;
+  if (objects.length === 0) return lang === 'rw' ? 'Inzira irahari' : 'Path is clear';
 
-  // Sort by danger then distance
   const sorted = [...objects].sort((a, b) => {
     const dangerOrder = { danger: 0, warning: 1, safe: 2 };
     if (dangerOrder[a.dangerLevel] !== dangerOrder[b.dangerLevel])
@@ -95,11 +124,18 @@ function buildVoiceSummary(objects: DetectedObject[]): string {
   });
 
   return sorted
-    .slice(0, 3) // speak max 3 objects to avoid overload
+    .slice(0, 3)
     .map((obj) => {
+      const dist = formatDistance(obj.distanceMeters, lang);
+      if (lang === 'rw') {
+        const name   = RW_NAMES[obj.name] ?? obj.name;
+        const moving = obj.isMoving ? 'igenda ' : '';
+        const dir    = obj.direction === 'center' ? 'imbere yawe' : obj.direction === 'left' ? 'ibumoso bwawe' : 'iburyo bwawe';
+        return `${moving}${name}, ${dist} ${dir}`;
+      }
       const moving = obj.isMoving ? 'moving ' : '';
-      const dir = obj.direction === 'center' ? 'ahead' : `on your ${obj.direction}`;
-      return `${moving}${obj.name}, ${formatDistance(obj.distanceMeters)} ${dir}`;
+      const dir    = obj.direction === 'center' ? 'ahead' : `on your ${obj.direction}`;
+      return `${moving}${obj.name}, ${dist} ${dir}`;
     })
     .join('. ');
 }

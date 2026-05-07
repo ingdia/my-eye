@@ -4,18 +4,24 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { COLORS } from '../../constants/colors';
-import { DetectionResult, detectFromFrame } from '../../services/detectionService';
+import { useLang } from '../../context/LanguageContext';
+import { DetectionResult, detectFromFrame, setDetectionLanguage } from '../../services/detectionService';
 import { speak } from '../../services/speechService';
 import { vibrateDanger, vibrateLeft, vibrateObstacle, vibrateRight } from '../../services/vibrationService';
 
 const STATUS_COLOR = { safe: COLORS.safe, warning: COLORS.warning, danger: COLORS.danger, scanning: COLORS.muted };
 
 export default function NavigationScreen() {
+  const { t, lang } = useLang();
   const [permission, requestPermission] = useCameraPermissions();
   const [result, setResult] = useState<DetectionResult | null>(null);
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef   = useRef<CameraView>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProcessing = useRef(false);
+
+  useEffect(() => {
+    setDetectionLanguage(lang);
+  }, [lang]);
 
   useEffect(() => {
     if (!permission?.granted) requestPermission();
@@ -23,7 +29,7 @@ export default function NavigationScreen() {
 
   useEffect(() => {
     if (!permission?.granted) return;
-    speak('Navigation started.');
+    speak(t('navStarted'));
     startLoop();
     return stopLoop;
   }, [permission?.granted]);
@@ -33,9 +39,7 @@ export default function NavigationScreen() {
       if (isProcessing.current || !cameraRef.current) return;
       isProcessing.current = true;
       try {
-        const photo = await cameraRef.current.takePictureAsync({
-          base64: true, quality: 0.4, skipProcessing: true,
-        });
+        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.4, skipProcessing: true });
         if (!photo?.base64) return;
         const detection = await detectFromFrame(photo.base64);
         setResult(detection);
@@ -61,62 +65,54 @@ export default function NavigationScreen() {
 
   function stopNavigation() {
     stopLoop();
-    speak('Navigation stopped. Stay safe.');
+    speak(t('navStopped'), true);
     router.replace('/(tabs)/stop');
   }
 
   if (!permission?.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.permText}>Camera access is needed to detect obstacles.</Text>
+        <Text style={styles.permText}>{t('cameraNeeded')}</Text>
         <TouchableOpacity onPress={requestPermission} style={styles.permButton}>
-          <Text style={styles.permButtonText}>Allow Camera</Text>
+          <Text style={styles.permButtonText}>{t('allowCamera')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const topDanger = result?.topDanger ?? 'scanning';
-  const dotColor = STATUS_COLOR[topDanger];
+  const dotColor  = STATUS_COLOR[topDanger];
 
   return (
     <View style={styles.screen}>
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
-
       <View style={styles.overlay}>
-        {/* Soft status dot */}
         <View style={[styles.dot, { backgroundColor: dotColor }]} />
-
-        {/* Summary */}
         <Text style={[styles.summary, { color: dotColor }]}>
-          {result?.summary ?? 'Scanning...'}
+          {result?.summary ?? t('scanning')}
         </Text>
-
-        {/* Object rows — calm, readable */}
         {result && result.objects.length > 0 && (
           <View style={styles.list}>
             {result.objects.slice(0, 3).map((obj, i) => (
               <View key={i} style={styles.row}>
                 <Text style={styles.objName}>{obj.name}</Text>
                 <Text style={styles.objDetail}>
-                  {obj.distanceMeters < 1 ? 'very close' : `${obj.distanceMeters.toFixed(1)} m`}
+                  {obj.distanceMeters < 1 ? t('veryClose') : `${obj.distanceMeters.toFixed(1)} m`}
                   {'  ·  '}
-                  {obj.direction === 'center' ? 'ahead' : obj.direction}
+                  {obj.direction === 'center' ? t('ahead') : obj.direction === 'left' ? t('onYourLeft') : t('onYourRight')}
                 </Text>
               </View>
             ))}
           </View>
         )}
-
-        {/* Soft stop button */}
         <TouchableOpacity
           onLongPress={stopNavigation}
           delayLongPress={800}
           style={styles.stopButton}
           accessibilityRole="button"
-          accessibilityLabel="Hold to stop navigation"
+          accessibilityLabel={t('holdToStop')}
         >
-          <Text style={styles.stopLabel}>hold to stop</Text>
+          <Text style={styles.stopLabel}>{t('holdToStop')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -124,52 +120,19 @@ export default function NavigationScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.background },
-  camera: { ...StyleSheet.absoluteFillObject, opacity: 0.1 },
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    gap: 20,
-  },
-  dot: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    opacity: 0.85,
-  },
-  summary: {
-    fontSize: 22,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 32,
-  },
-  list: { width: '100%', gap: 8 },
-  row: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  objName: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
-  objDetail: { color: COLORS.muted, fontSize: 14 },
-  stopButton: {
-    marginTop: 24,
-    backgroundColor: COLORS.stopButton,
-    paddingVertical: 18,
-    paddingHorizontal: 48,
-    borderRadius: 50,
-  },
-  stopLabel: { color: COLORS.muted, fontSize: 16, letterSpacing: 1 },
-  center: {
-    flex: 1, backgroundColor: COLORS.background,
-    justifyContent: 'center', alignItems: 'center', padding: 32,
-  },
-  permText: { color: COLORS.text, fontSize: 18, textAlign: 'center', marginBottom: 24 },
-  permButton: { backgroundColor: COLORS.button, padding: 16, borderRadius: 12 },
+  screen:         { flex: 1, backgroundColor: COLORS.background },
+  camera:         { ...StyleSheet.absoluteFillObject, opacity: 0.1 },
+  overlay:        { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 20 },
+  dot:            { width: 60, height: 60, borderRadius: 30, opacity: 0.85 },
+  summary:        { fontSize: 22, fontWeight: '500', textAlign: 'center', lineHeight: 32 },
+  list:           { width: '100%', gap: 8 },
+  row:            { backgroundColor: COLORS.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  objName:        { color: COLORS.text, fontSize: 16, fontWeight: '500' },
+  objDetail:      { color: COLORS.muted, fontSize: 14 },
+  stopButton:     { marginTop: 24, backgroundColor: COLORS.stopButton, paddingVertical: 18, paddingHorizontal: 48, borderRadius: 50 },
+  stopLabel:      { color: COLORS.muted, fontSize: 16, letterSpacing: 1 },
+  center:         { flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  permText:       { color: COLORS.text, fontSize: 18, textAlign: 'center', marginBottom: 24 },
+  permButton:     { backgroundColor: COLORS.button, padding: 16, borderRadius: 12 },
   permButtonText: { color: COLORS.buttonText, fontSize: 16, fontWeight: '600' },
 });

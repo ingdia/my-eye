@@ -4,16 +4,18 @@ import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import VoiceIndicator from '../../components/VoiceIndicator';
 import { COLORS } from '../../constants/colors';
+import { useLang } from '../../context/LanguageContext';
 import { speak } from '../../services/speechService';
 import { startListening, stopListening } from '../../services/voiceService';
 
 export default function HomeScreen() {
+  const { t } = useLang();
   const [listening, setListening] = useState(false);
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    speak('E-mboni is ready. Tap once to start. Tap twice to record.');
+    speak(t('ready'));
   }, []);
 
   function handleTap() {
@@ -27,7 +29,7 @@ export default function HomeScreen() {
   }
 
   function handleSingleTap() {
-    speak('Starting navigation');
+    speak(t('startingNav'));
     router.push('/(tabs)/navigation');
   }
 
@@ -35,14 +37,17 @@ export default function HomeScreen() {
     if (listening) {
       stopListening();
       setListening(false);
-      speak('Done listening');
+      speak(t('doneListening'));
     } else {
       setListening(true);
-      speak('Listening. Say start to begin.');
+      speak(t('listening'));
       startListening((result) => {
         setListening(false);
-        if (result.toLowerCase().includes('start')) handleSingleTap();
-        else speak('Say start to begin, or tap the screen.');
+        if (result.toLowerCase().includes('start') || result.toLowerCase().includes('tangira')) {
+          handleSingleTap();
+        } else {
+          speak(t('sayStart'));
+        }
       });
     }
   }
@@ -53,13 +58,11 @@ export default function HomeScreen() {
       onPress={handleTap}
       activeOpacity={1}
       accessibilityRole="button"
-      accessibilityLabel="Tap once to start. Tap twice to use voice."
+      accessibilityLabel={t('ready')}
     >
-      <Text style={styles.appName}>E-mboni</Text>
-      <Text style={styles.tagline}>Your mobility companion</Text>
-
-      <Text style={styles.hint}>tap anywhere to begin</Text>
-
+      <Text style={styles.appName}>{t('appName')}</Text>
+      <Text style={styles.tagline}>{t('tagline')}</Text>
+      <Text style={styles.hint}>{t('tapHint')}</Text>
       <VoiceIndicator active={listening} />
     </TouchableOpacity>
   );
@@ -74,20 +77,7 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 32,
   },
-  appName: {
-    color: COLORS.text,
-    fontSize: 42,
-    fontWeight: '600',
-    letterSpacing: 2,
-  },
-  tagline: {
-    color: COLORS.muted,
-    fontSize: 15,
-    marginBottom: 40,
-  },
-  hint: {
-    color: COLORS.muted,
-    fontSize: 14,
-    marginBottom: 32,
-  },
+  appName:  { color: COLORS.text, fontSize: 42, fontWeight: '600', letterSpacing: 2 },
+  tagline:  { color: COLORS.muted, fontSize: 15, marginBottom: 40 },
+  hint:     { color: COLORS.muted, fontSize: 14, marginBottom: 32 },
 });
