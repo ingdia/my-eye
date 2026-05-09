@@ -22,7 +22,7 @@ export function speak(text: string, urgent = false): void {
   const clearKey = currentLang === 'rw' ? 'Inzira irahari' : 'Path is clear';
   if (text === clearKey) {
     consecutiveClearCount++;
-    if (consecutiveClearCount > 1) return;
+    if (consecutiveClearCount > 1) return; // silent after first clear
   } else {
     consecutiveClearCount = 0;
   }
@@ -36,8 +36,8 @@ export function speak(text: string, urgent = false): void {
   setTimeout(() => {
     Speech.speak(text, {
       language: TTS_LANG[currentLang],
-      rate: 0.85,
-      pitch: 1.0,
+      rate:  urgent ? 1.1 : 0.75, // danger = fast, warning = medium/calm
+      pitch: urgent ? 1.2 : 1.0,
     });
   }, urgent ? 0 : 100);
 }

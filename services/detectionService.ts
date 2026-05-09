@@ -173,32 +173,33 @@ const MOCK_SCENARIOS: DetectedObject[][] = [
   ],
 ];
 
+// ─── Change this IP to your backend laptop's local IP ───────────────────────
+const API_BASE = 'http://192.168.1.100:8000';
+
 let mockIndex = 0;
 
-/**
- * MOCK: Simulates AI detection results for frontend development.
- * Backend team will replace this function body with a real API call.
- * The function signature and return type must stay the same.
- */
 export async function detectFromFrame(
-  _base64Image: string
+  base64Image: string
 ): Promise<DetectionResult> {
-  // Simulate network delay
-  await new Promise((r) => setTimeout(r, 600));
+  try {
+    const response = await fetch(`${API_BASE}/detect?lang=${_lang}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64Image, lang: _lang }),
+    });
 
-  const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
-  mockIndex++;
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
 
-  const topDanger: DangerLevel =
-    objects.some((o) => o.dangerLevel === 'danger')
-      ? 'danger'
-      : objects.some((o) => o.dangerLevel === 'warning')
-      ? 'warning'
-      : 'safe';
-
-  return {
-    objects,
-    summary: buildVoiceSummary(objects),
-    topDanger,
-  };
+    const data = await response.json();
+    return data as DetectionResult;
+  } catch (e) {
+    // Fallback to mock if backend is unreachable
+    console.warn('Backend unreachable, using mock:', e);
+    const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
+    mockIndex++;
+    const topDanger: DangerLevel =
+      objects.some((o) => o.dangerLevel === 'danger') ? 'danger' :
+      objects.some((o) => o.dangerLevel === 'warning') ? 'warning' : 'safe';
+    return { objects, summary: buildVoiceSummary(objects), topDanger };
+  }
 }
