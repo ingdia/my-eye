@@ -109,7 +109,7 @@ export const translations = {
     whoAreYou:        'Ni nde uri we?',
     guardian:         'Umurezi',
     guardianDesc:     'Umubyeyi, umujyanama, cyangwa umuntu wizewe',
-    blindUser:        'Impumyi',
+    blindUser:        'umuntu ufite ubumuga bwo kutabona',
     blindUserDesc:    'Yandikishijwe na murezi mu izina ryawe',
     alreadyAccount:   'Usanzwe ufite konti?',
     signIn:           'Injira',
