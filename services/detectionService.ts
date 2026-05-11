@@ -140,66 +140,66 @@ function buildVoiceSummary(objects: DetectedObject[]): string {
     .join('. ');
 }
 
-// ─── Mock scenarios — realistic detections for UI testing ───────────────────
+// ─── Demo scenarios — cycles through DANGER → WARNING → SAFE clearly ────────
 const MOCK_SCENARIOS: DetectedObject[][] = [
-  [], // path clear
+
+  // 1. DANGER — moving car very close
   [
-    { name: 'chair', isMoving: false, distanceMeters: 1.5, direction: 'center', dangerLevel: 'danger' },
+    { name: 'car',    isMoving: true,  distanceMeters: 2.0, direction: 'center', dangerLevel: 'danger' },
   ],
+
+  // 2. DANGER — dog right in front
   [
-    { name: 'car', isMoving: true, distanceMeters: 3.0, direction: 'left', dangerLevel: 'danger' },
-    { name: 'person', isMoving: true, distanceMeters: 5.0, direction: 'center', dangerLevel: 'warning' },
+    { name: 'dog',    isMoving: true,  distanceMeters: 1.0, direction: 'center', dangerLevel: 'danger' },
   ],
-  [
-    { name: 'table', isMoving: false, distanceMeters: 2.0, direction: 'right', dangerLevel: 'warning' },
-  ],
-  [
-    { name: 'dog', isMoving: true, distanceMeters: 1.0, direction: 'center', dangerLevel: 'danger' },
-  ],
+
+  // 3. DANGER — stairs ahead + bus on left
   [
     { name: 'stairs', isMoving: false, distanceMeters: 1.5, direction: 'center', dangerLevel: 'danger' },
-    { name: 'bench', isMoving: false, distanceMeters: 4.0, direction: 'right', dangerLevel: 'warning' },
+    { name: 'bus',    isMoving: true,  distanceMeters: 4.0, direction: 'left',   dangerLevel: 'danger' },
   ],
-  [
-    { name: 'bus', isMoving: true, distanceMeters: 6.0, direction: 'left', dangerLevel: 'danger' },
-  ],
-  [], // path clear
-  [
-    { name: 'pole', isMoving: false, distanceMeters: 1.0, direction: 'center', dangerLevel: 'danger' },
-  ],
-  [
-    { name: 'bicycle', isMoving: true, distanceMeters: 2.5, direction: 'right', dangerLevel: 'warning' },
-    { name: 'trash can', isMoving: false, distanceMeters: 3.5, direction: 'left', dangerLevel: 'warning' },
-  ],
-];
 
-// ─── Change this IP to your backend laptop's local IP ───────────────────────
-const API_BASE = 'http://192.168.1.100:8000';
+  // 4. WARNING — chair nearby
+  [
+    { name: 'chair',  isMoving: false, distanceMeters: 2.5, direction: 'center', dangerLevel: 'warning' },
+  ],
+
+  // 5. WARNING — person on right + bicycle on left
+  [
+    { name: 'person',  isMoving: true,  distanceMeters: 3.0, direction: 'right', dangerLevel: 'warning' },
+    { name: 'bicycle', isMoving: true,  distanceMeters: 3.5, direction: 'left',  dangerLevel: 'warning' },
+  ],
+
+  // 6. WARNING — table on right
+  [
+    { name: 'table',  isMoving: false, distanceMeters: 2.0, direction: 'right',  dangerLevel: 'warning' },
+  ],
+
+  // 7. SAFE — path clear
+  [],
+
+  // 8. SAFE — path clear
+  [],
+
+];
 
 let mockIndex = 0;
 
 export async function detectFromFrame(
-  base64Image: string
+  _base64Image: string
 ): Promise<DetectionResult> {
-  try {
-    const response = await fetch(`${API_BASE}/detect?lang=${_lang}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Image, lang: _lang }),
-    });
+  await new Promise((r) => setTimeout(r, 600));
 
-    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+  const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
+  mockIndex++;
 
-    const data = await response.json();
-    return data as DetectionResult;
-  } catch (e) {
-    // Fallback to mock if backend is unreachable
-    console.warn('Backend unreachable, using mock:', e);
-    const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
-    mockIndex++;
-    const topDanger: DangerLevel =
-      objects.some((o) => o.dangerLevel === 'danger') ? 'danger' :
-      objects.some((o) => o.dangerLevel === 'warning') ? 'warning' : 'safe';
-    return { objects, summary: buildVoiceSummary(objects), topDanger };
-  }
+  const topDanger: DangerLevel =
+    objects.some((o) => o.dangerLevel === 'danger')  ? 'danger'  :
+    objects.some((o) => o.dangerLevel === 'warning') ? 'warning' : 'safe';
+
+  return {
+    objects,
+    summary:   buildVoiceSummary(objects),
+    topDanger,
+  };
 }

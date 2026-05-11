@@ -69,6 +69,12 @@ export const translations = {
     back:             'Back',
     welcomeBack:      'Welcome back',
     signInAccount:    'Sign in to your E-mboni account',
+
+    // Emergency
+    emergencyActive:  'Emergency Active',
+    emergencyMsg:     'Stay calm. Your guardian is being notified.',
+    callGuardian:     'Call Guardian',
+    cancelEmergency:  'Cancel Emergency',
   },
 
   rw: {
@@ -139,6 +145,12 @@ export const translations = {
     back:             'Subira Inyuma',
     welcomeBack:      'Murakaza neza',
     signInAccount:    'Injira muri konti yawe ya E-mboni',
+
+    // Emergency
+    emergencyActive:  'Impanuka Ihari',
+    emergencyMsg:     'Komera. Umurezi wawe aratangazwa.',
+    callGuardian:     'Hamagara Umurezi',
+    cancelEmergency:  'Hagarika Impanuka',
   },
 };
 

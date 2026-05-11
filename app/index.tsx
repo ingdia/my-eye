@@ -79,7 +79,7 @@ export default function SplashScreen() {
 
         {/* Tagline */}
         <Animated.Text style={[styles.tagline, { opacity: tagOpacity }]}>
-          AI Mobility Assistant
+          See through AI. Move with confidence.
         </Animated.Text>
 
         {/* Loading dots */}

@@ -1,23 +1,42 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
-const USER = { name: 'James Kamau', status: 'Scanning', battery: 82, lastSeen: '2 min ago' };
+const BLIND_PHONE = '+250711000002'; // replace with real number from backend later
 
-const ALERTS = [
-  { message: 'Chair — 1.5m ahead',          time: '5 min ago',  level: 'warning' },
-  { message: 'Path was clear',               time: '12 min ago', level: 'safe'    },
-  { message: 'Moving car — 3m on the left',  time: '1 hr ago',   level: 'danger'  },
+const USER    = { name: 'James Kamau', status: 'Scanning', battery: 82, lastSeen: '2 min ago' };
+const ALERTS  = [
+  { message: 'Chair — 1.5m ahead',         time: '5 min ago',  level: 'warning' },
+  { message: 'Path was clear',              time: '12 min ago', level: 'safe'    },
+  { message: 'Moving car — 3m on the left', time: '1 hr ago',   level: 'danger'  },
 ];
 
 export default function GuardianDashboard() {
   const { colors } = useTheme();
+  const [showMsg, setShowMsg] = useState(false);
+  const [msgText, setMsgText] = useState('');
 
   const statusDot =
-    USER.status === 'Safe'               ? colors.safe    :
-    USER.status === 'Obstacle Detected'  ? colors.warning :
-    USER.status === 'Danger Alert'       ? colors.danger  : colors.muted;
+    USER.status === 'Safe'              ? colors.safe    :
+    USER.status === 'Obstacle Detected' ? colors.warning :
+    USER.status === 'Danger Alert'      ? colors.danger  : colors.muted;
+
+  function handleCall() {
+    Linking.openURL(`tel:${BLIND_PHONE}`).catch(() =>
+      Alert.alert('Cannot call', 'Phone dialer is not available on this device.')
+    );
+  }
+
+  function handleSendMessage() {
+    if (!msgText.trim()) return;
+    Linking.openURL(`sms:${BLIND_PHONE}?body=${encodeURIComponent(msgText.trim())}`).catch(() =>
+      Alert.alert('Cannot send SMS', 'SMS is not available on this device.')
+    );
+    setMsgText('');
+    setShowMsg(false);
+  }
 
   return (
     <ScrollView
@@ -68,10 +87,41 @@ export default function GuardianDashboard() {
 
       {/* ── Action pills ── */}
       <View style={styles.actions}>
-        <ActionPill icon="call-outline"     label="Call"    onPress={() => {}}                                          colors={colors} />
-        <ActionPill icon="mic-outline"      label="Message" onPress={() => {}}                                          colors={colors} />
+        <ActionPill icon="call"             label="Call"    onPress={handleCall}                               colors={colors} />
+        <ActionPill icon="chatbubble"       label="Message" onPress={() => setShowMsg(v => !v)}               colors={colors} />
         <ActionPill icon="location-outline" label="Track"   onPress={() => router.push('/(guardian)/tracking')} colors={colors} primary />
       </View>
+
+      {/* ── Message composer ── */}
+      {showMsg && (
+        <View style={[styles.msgCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.msgTitle, { color: colors.text }]}>Send message to {USER.name}</Text>
+          <TextInput
+            style={[styles.msgInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+            placeholder="Type a message..."
+            placeholderTextColor={colors.muted}
+            value={msgText}
+            onChangeText={setMsgText}
+            multiline
+            autoFocus
+          />
+          <View style={styles.msgActions}>
+            <TouchableOpacity
+              style={[styles.msgBtn, { backgroundColor: colors.border }]}
+              onPress={() => { setShowMsg(false); setMsgText(''); }}
+            >
+              <Text style={[styles.msgBtnText, { color: colors.muted }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.msgBtn, { backgroundColor: colors.accent }]}
+              onPress={handleSendMessage}
+            >
+              <Ionicons name="send" size={14} color="#fff" />
+              <Text style={[styles.msgBtnText, { color: '#fff' }]}>Send SMS</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ── Recent activity ── */}
       <Text style={[styles.sectionLabel, { color: colors.muted }]}>Recent Activity</Text>
@@ -150,4 +200,10 @@ const styles = StyleSheet.create({
   alertDot:      { width: 8, height: 8, borderRadius: 4 },
   alertMsg:      { fontSize: 14, fontWeight: '500', lineHeight: 20 },
   alertTime:     { fontSize: 11, marginTop: 2 },
+  msgCard:      { borderRadius: 20, borderWidth: 1, padding: 16, gap: 12 },
+  msgTitle:     { fontSize: 14, fontWeight: '600' },
+  msgInput:     { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: 'top' },
+  msgActions:   { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+  msgBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+  msgBtnText:   { fontSize: 13, fontWeight: '700' },
 });

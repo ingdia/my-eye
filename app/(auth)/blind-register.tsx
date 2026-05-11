@@ -5,6 +5,7 @@ import { G_DARK } from '../../constants/colors';
 import { useLang } from '../../context/LanguageContext';
 import { setLanguage } from '../../services/speechService';
 import { setDetectionLanguage } from '../../services/detectionService';
+import { saveLocationConsent } from '../../services/locationConsentService';
 import { Lang } from '../../i18n/translations';
 
 const C = G_DARK;
@@ -18,17 +19,19 @@ const SPEEDS = ['Slow', 'Normal', 'Fast'];
 
 export default function BlindRegisterScreen() {
   const { t, setLang } = useLang();
-  const [name, setName]         = useState('');
-  const [phone, setPhone]       = useState('');
-  const [emergency, setEmergency] = useState('');
-  const [lang, setLangLocal]    = useState<Lang>('en');
-  const [speed, setSpeed]       = useState('Normal');
+  const [name, setName]             = useState('');
+  const [phone, setPhone]           = useState('');
+  const [emergency, setEmergency]   = useState('');
+  const [lang, setLangLocal]        = useState<Lang>('en');
+  const [speed, setSpeed]           = useState('Normal');
+  const [locationAllowed, setLocationAllowed] = useState<boolean | null>(null);
 
-  function handleDone() {
-    // Apply language globally
+  async function handleDone() {
+    if (locationAllowed === null) return; // force a choice
     setLang(lang);
     setLanguage(lang);
     setDetectionLanguage(lang);
+    await saveLocationConsent(locationAllowed);
     // TODO: backend — save blind user
     router.replace('/(guardian)');
   }
@@ -78,9 +81,46 @@ export default function BlindRegisterScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Location sharing consent */}
+        <Text style={styles.label}>
+          {lang === 'rw' ? 'Emera ko umurezi abona aho uri' : 'Allow guardian to see your location?'}
+        </Text>
+        <Text style={[styles.consentNote, { color: C.muted }]}>
+          {lang === 'rw'
+            ? 'Iyi ni amahitamo y\'impumyi. Bashobora guhindura ibi igihe icyo aricyo cyose.'
+            : 'This is the blind user\'s choice. They can change it anytime.'}
+        </Text>
+        <View style={styles.chips}>
+          <TouchableOpacity
+            style={[styles.chip, locationAllowed === true && styles.chipActive]}
+            onPress={() => setLocationAllowed(true)}
+          >
+            <Text style={[styles.chipText, locationAllowed === true && styles.chipTextActive]}>
+              {lang === 'rw' ? '✓  Emera' : '✓  Allow'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, locationAllowed === false && { backgroundColor: C.danger, borderColor: C.danger }]}
+            onPress={() => setLocationAllowed(false)}
+          >
+            <Text style={[styles.chipText, locationAllowed === false && styles.chipTextActive]}>
+              {lang === 'rw' ? '✕  Anga' : '✕  Deny'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {locationAllowed === null && (
+          <Text style={[styles.consentWarn, { color: C.danger }]}>
+            {lang === 'rw' ? 'Hitamo imwe' : 'Please make a choice to continue'}
+          </Text>
+        )}
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleDone}>
+      <TouchableOpacity
+        style={[styles.button, locationAllowed === null && styles.buttonDisabled]}
+        onPress={handleDone}
+        disabled={locationAllowed === null}
+      >
         <Text style={styles.buttonText}>{t('done')}</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -104,4 +144,7 @@ const styles = StyleSheet.create({
   chipTextActive:  { color: '#fff', fontWeight: '600' },
   button:          { backgroundColor: C.accent, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 24 },
   buttonText:      { color: '#fff', fontSize: 16, fontWeight: '600' },
+  consentNote:     { fontSize: 12, lineHeight: 18, marginBottom: 8, marginTop: -2 },
+  consentWarn:     { fontSize: 12, marginTop: 4 },
+  buttonDisabled:  { opacity: 0.4 },
 });
