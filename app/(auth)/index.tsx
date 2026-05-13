@@ -63,20 +63,16 @@ export default function RoleSelectScreen() {
             <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.card, styles.cardAccent]}
-            onPress={() => router.push('/(auth)/blind-register')}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Ionicons name="mic" size={28} color="#fff" />
+          {/* Blind users are registered by their guardian — this card is informational only */}
+          <View style={[styles.card, styles.cardMuted]}>
+            <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+              <Ionicons name="mic" size={28} color="rgba(255,255,255,0.35)" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.cardTitle, { color: '#fff' }]}>{t('blindUser')}</Text>
-              <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.75)' }]}>{t('blindUserDesc')}</Text>
+              <Text style={[styles.cardTitle, { color: 'rgba(255,255,255,0.4)' }]}>{t('blindUser')}</Text>
+              <Text style={[styles.cardDesc, { color: 'rgba(255,255,255,0.3)' }]}>{t('blindUserDesc')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Sign in link */}
@@ -113,6 +109,7 @@ const styles = StyleSheet.create({
   cards:        { gap: 14 },
   card:         { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 20, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   cardAccent:   { backgroundColor: C.accent, borderColor: C.accent },
+  cardMuted:    { opacity: 0.6 },
   cardIconWrap: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   cardTitle:    { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 3 },
   cardDesc:     { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18 },

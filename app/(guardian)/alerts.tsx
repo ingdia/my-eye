@@ -1,7 +1,9 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
+import { apiFetch } from '../../services/api';
 
-const ALERTS = [
+const FALLBACK_ALERTS = [
   { message: 'Chair detected — 1.5m ahead',       time: 'Just now',   level: 'warning' },
   { message: 'Moving car — 3m on the left',        time: '5 min ago',  level: 'danger'  },
   { message: 'Navigation started',                 time: '8 min ago',  level: 'safe'    },
@@ -13,6 +15,17 @@ const ALERTS = [
 
 export default function AlertsScreen() {
   const { colors } = useTheme();
+  const [alerts,       setAlerts]       = useState<any[]>(FALLBACK_ALERTS);
+  const [blindUserName, setBlindUserName] = useState('James Kamau');
+
+  useEffect(() => {
+    apiFetch('/guardian/alerts')
+      .then(data => {
+        if (data.alerts)         setAlerts(data.alerts);
+        if (data.blind_user_name) setBlindUserName(data.blind_user_name);
+      })
+      .catch(() => {});
+  }, []);
 
   function levelColor(level: string) {
     if (level === 'danger')  return colors.danger;
@@ -27,12 +40,12 @@ export default function AlertsScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
-      <Text style={[styles.sub, { color: colors.muted }]}>James Kamau · Today</Text>
+      <Text style={[styles.sub, { color: colors.muted }]}>{blindUserName} · Today</Text>
 
       <View style={[styles.pillCard, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.accent }]}>
-        {ALERTS.map((a, i) => {
+        {alerts.map((a: any, i: number) => {
           const color  = levelColor(a.level);
-          const isLast = i === ALERTS.length - 1;
+          const isLast = i === alerts.length - 1;
           return (
             <View
               key={i}

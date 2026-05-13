@@ -78,6 +78,7 @@ function getDangerLevel(name: string, distance: number, isMoving: boolean): Dang
 }
 
 import { Lang } from '../i18n/translations';
+import { API_BASE } from './api';
 
 let _lang: Lang = 'en';
 export function setDetectionLanguage(lang: Lang): void { _lang = lang; }
@@ -186,20 +187,23 @@ const MOCK_SCENARIOS: DetectedObject[][] = [
 let mockIndex = 0;
 
 export async function detectFromFrame(
-  _base64Image: string
+  base64Image: string
 ): Promise<DetectionResult> {
-  await new Promise((r) => setTimeout(r, 600));
-
-  const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
-  mockIndex++;
-
-  const topDanger: DangerLevel =
-    objects.some((o) => o.dangerLevel === 'danger')  ? 'danger'  :
-    objects.some((o) => o.dangerLevel === 'warning') ? 'warning' : 'safe';
-
-  return {
-    objects,
-    summary:   buildVoiceSummary(objects),
-    topDanger,
-  };
+  try {
+    const res = await fetch(`${API_BASE}/detect`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ image: base64Image, lang: _lang }),
+    });
+    if (!res.ok) throw new Error('backend error');
+    return await res.json() as DetectionResult;
+  } catch {
+    // backend unreachable — fall back to mock so app still works
+    const objects = MOCK_SCENARIOS[mockIndex % MOCK_SCENARIOS.length];
+    mockIndex++;
+    const topDanger: DangerLevel =
+      objects.some((o) => o.dangerLevel === 'danger')  ? 'danger'  :
+      objects.some((o) => o.dangerLevel === 'warning') ? 'warning' : 'safe';
+    return { objects, summary: buildVoiceSummary(objects), topDanger };
+  }
 }

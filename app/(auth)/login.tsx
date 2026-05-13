@@ -6,13 +6,10 @@ import { G_DARK } from '../../constants/colors';
 import { useLang } from '../../context/LanguageContext';
 import { setDetectionLanguage } from '../../services/detectionService';
 import { setLanguage } from '../../services/speechService';
+import { apiFetch, saveToken, saveUser } from '../../services/api';
+import { findAccount } from '../../services/accountsService';
 
 const C = G_DARK;
-
-const DEMO_ACCOUNTS = [
-  { role: 'guardian', phone: '+250 711 000 001', password: 'guardian123', icon: 'shield-checkmark' as const, route: '/(guardian)' },
-  { role: 'blind',    phone: '+250 711 000 002', password: 'blind123',    icon: 'mic'              as const, route: '/(tabs)'     },
-];
 
 export default function LoginScreen() {
   const { t, lang, setLang } = useLang();
@@ -20,6 +17,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
   function applyLang(l: 'en' | 'rw') {
     setLang(l);
@@ -27,14 +25,37 @@ export default function LoginScreen() {
     setDetectionLanguage(l);
   }
 
-  function handleLogin() {
-    const match = DEMO_ACCOUNTS.find(a => a.phone === phone.trim() && a.password === password.trim());
-    if (match) {
-      router.replace(match.route as any);
-    } else {
-      setError(lang === 'rw'
-        ? 'Nimero cyangwa ijambo banga sibyo.'
-        : 'Wrong phone or password.');
+  async function handleLogin() {
+    if (!phone.trim() || !password.trim()) {
+      setError(lang === 'rw' ? 'Uzuza ibisabwa byose.' : 'Please fill in all fields.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = await apiFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ phone: phone.trim(), password: password.trim() }),
+      });
+      await saveToken(data.token);
+      await saveUser(data.user);
+      if (data.user.role === 'guardian') router.replace('/(guardian)');
+      else if (data.user.role === 'admin') router.replace('/(admin)');
+      else router.replace('/(tabs)');
+      return;
+    } catch (error: any) {
+      const local = await findAccount(phone.trim(), password.trim());
+      if (!error.status && local) {
+        if (local.role === 'guardian') router.replace('/(guardian)');
+        else if (local.role === 'blind') router.replace('/(tabs)');
+        else router.replace('/(admin)');
+        setLoading(false);
+        return;
+      }
+      setError(lang === 'rw' ? 'Nimero cyangwa ijambo banga sibyo.' : 'Wrong phone or password.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -76,6 +97,14 @@ export default function LoginScreen() {
           </View>
           <Text style={styles.title}>{t('welcomeBack')}</Text>
           <Text style={styles.subtitle}>{t('signInAccount')}</Text>
+          <View style={styles.hintBox}>
+            <Ionicons name="information-circle-outline" size={14} color={C.muted} />
+            <Text style={styles.hintText}>
+              {lang === 'rw'
+                ? 'Impumyi: injira ukoresheje nimero yawe na ijambo banga ryashyizweho na murezi wawe.'
+                : 'Blind user: log in with your phone number and the password your guardian set for you.'}
+            </Text>
+          </View>
         </View>
 
         {/* Form card */}
@@ -116,45 +145,10 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.button} onPress={handleLogin}>
-            <Text style={styles.buttonText}>{t('signIn')}</Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          <TouchableOpacity style={[styles.button, loading && { opacity: 0.6 }]} onPress={handleLogin} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? '...' : t('signIn')}</Text>
+            {!loading && <Ionicons name="arrow-forward" size={18} color="#fff" />}
           </TouchableOpacity>
-        </View>
-
-        {/* Demo accounts */}
-        <View style={styles.demoSection}>
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>
-              {lang === 'rw' ? 'Konti za Demo' : 'Demo Accounts'}
-            </Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {DEMO_ACCOUNTS.map((a) => (
-            <TouchableOpacity
-              key={a.role}
-              style={styles.demoCard}
-              onPress={() => router.replace(a.route as any)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.demoIconWrap}>
-                <Ionicons name={a.icon} size={22} color={C.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.demoRole}>
-                  {a.role === 'guardian' ? t('guardian') : t('blindUser')}
-                </Text>
-                <Text style={styles.demoCred}>{a.phone}  ·  {a.password}</Text>
-              </View>
-              <View style={styles.demoBadge}>
-                <Text style={styles.demoBadgeText}>
-                  {lang === 'rw' ? 'Injira' : 'Login'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
         </View>
 
       </ScrollView>
@@ -179,6 +173,8 @@ const styles = StyleSheet.create({
   logoIcon:      { width: 56, height: 56, borderRadius: 18, backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
   title:         { color: '#fff', fontSize: 26, fontWeight: '800' },
   subtitle:      { color: 'rgba(255,255,255,0.45)', fontSize: 13 },
+  hintBox:       { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginTop: 4 },
+  hintText:      { color: 'rgba(255,255,255,0.35)', fontSize: 11, lineHeight: 16, flex: 1 },
 
   formCard:      { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', padding: 20, gap: 12 },
   inputWrap:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 14 },

@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { getLocationConsent } from '../../services/locationConsentService';
+import { apiFetch } from '../../services/api';
 
-const ACTIVITY = [
+const FALLBACK_ACTIVITY = [
   { time: '10:40', event: 'Navigation stopped',          level: 'muted'   },
   { time: '10:38', event: 'Path clear',                  level: 'safe'    },
   { time: '10:37', event: 'Moving car — 3m on the left', level: 'danger'  },
@@ -17,15 +18,24 @@ const ACTIVITY = [
 export default function TrackingScreen() {
   const { colors } = useTheme();
 
-  const [consent, setConsent]     = useState<boolean | null>(null);
-  const [location, setLocation]   = useState<{ lat: number; lng: number } | null>(null);
-  const [locError, setLocError]   = useState('');
-  const [loading, setLoading]     = useState(true);
+  const [consent,   setConsent]   = useState<boolean | null>(null);
+  const [location,  setLocation]  = useState<{ lat: number; lng: number } | null>(null);
+  const [locError,  setLocError]  = useState('');
+  const [loading,   setLoading]   = useState(true);
+  const [activity,  setActivity]  = useState<any[]>(FALLBACK_ACTIVITY);
+  const [session,   setSession]   = useState({ status: 'Safe', duration_minutes: 8, alert_count: 3 });
 
   useEffect(() => {
     async function init() {
       const allowed = await getLocationConsent();
       setConsent(allowed);
+
+      apiFetch('/guardian/tracking')
+        .then(data => {
+          if (data.timeline) setActivity(data.timeline);
+          if (data.session)  setSession(data.session);
+        })
+        .catch(() => {});
 
       if (allowed === true) {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -67,10 +77,8 @@ export default function TrackingScreen() {
       <Text style={[styles.title, { color: colors.text }]}>Tracking</Text>
       <Text style={[styles.sub, { color: colors.muted }]}>James Kamau · Active session</Text>
 
-      {/* ── Location card ── */}
+      {/* Location card */}
       <View style={[styles.pillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-
-        {/* Consent denied */}
         {consent === false && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.danger + '18' }]}>
@@ -83,7 +91,6 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Never answered */}
         {consent === null && !loading && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.muted + '18' }]}>
@@ -96,7 +103,6 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Loading */}
         {loading && (
           <View style={styles.mapInner}>
             <Ionicons name="locate-outline" size={32} color={colors.accent} />
@@ -104,7 +110,6 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Location error */}
         {consent === true && !loading && locError !== '' && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.warning + '18' }]}>
@@ -115,15 +120,12 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {/* Location allowed + loaded */}
         {consent === true && !loading && location && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.safe + '18' }]}>
               <Ionicons name="location" size={32} color={colors.safe} />
             </View>
             <Text style={[styles.mapTitle, { color: colors.text }]}>Location Sharing On</Text>
-
-            {/* Coordinates */}
             <View style={[styles.coordCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.coordRow}>
                 <Text style={[styles.coordLabel, { color: colors.muted }]}>Latitude</Text>
@@ -135,29 +137,20 @@ export default function TrackingScreen() {
                 <Text style={[styles.coordValue, { color: colors.text }]}>{location.lng.toFixed(6)}</Text>
               </View>
             </View>
-
-            {/* Open in Google Maps */}
-            <TouchableOpacity
-              style={[styles.mapsBtn, { backgroundColor: colors.accent }]}
-              onPress={openInMaps}
-            >
+            <TouchableOpacity style={[styles.mapsBtn, { backgroundColor: colors.accent }]} onPress={openInMaps}>
               <Ionicons name="map" size={16} color="#fff" />
               <Text style={styles.mapsBtnText}>Open in Google Maps</Text>
             </TouchableOpacity>
-
-            <Text style={[styles.mapSub, { color: colors.muted }]}>
-              Live map available after backend setup
-            </Text>
           </View>
         )}
       </View>
 
-      {/* ── Stat pills ── */}
+      {/* Stat pills */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Status',   value: 'Safe',  color: colors.safe    },
-          { label: 'Duration', value: '8 min', color: colors.accent  },
-          { label: 'Alerts',   value: '3',     color: colors.warning },
+          { label: 'Status',   value: session.status,                        color: colors.safe    },
+          { label: 'Duration', value: `${session.duration_minutes} min`,     color: colors.accent  },
+          { label: 'Alerts',   value: `${session.alert_count}`,              color: colors.warning },
         ].map((s, i) => (
           <View key={i} style={[styles.statPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
@@ -166,12 +159,12 @@ export default function TrackingScreen() {
         ))}
       </View>
 
-      {/* ── Session timeline ── */}
+      {/* Session timeline */}
       <Text style={[styles.sectionLabel, { color: colors.muted }]}>Session Timeline</Text>
       <View style={[styles.pillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={{ padding: 16 }}>
-          {ACTIVITY.map((item, i) => {
-            const isLast = i === ACTIVITY.length - 1;
+          {activity.map((item: any, i: number) => {
+            const isLast = i === activity.length - 1;
             return (
               <View key={i} style={styles.timelineRow}>
                 <View style={styles.timelineLeft}>
@@ -193,36 +186,31 @@ export default function TrackingScreen() {
 }
 
 const styles = StyleSheet.create({
-  content:        { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 120, gap: 14 },
-  title:          { fontSize: 26, fontWeight: '700' },
-  sub:            { fontSize: 13, marginTop: -8 },
-
-  pillCard:       { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
-  mapInner:       { padding: 28, alignItems: 'center', gap: 12 },
-  iconWrap:       { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  mapTitle:       { fontSize: 16, fontWeight: '700' },
-  mapSub:         { fontSize: 12, lineHeight: 18 },
-
-  coordCard:      { width: '100%', borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  coordRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
-  coordDivider:   { height: 1 },
-  coordLabel:     { fontSize: 12 },
-  coordValue:     { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-
-  mapsBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14 },
-  mapsBtnText:    { color: '#fff', fontSize: 14, fontWeight: '700' },
-
-  statsRow:       { flexDirection: 'row', gap: 10 },
-  statPill:       { flex: 1, borderRadius: 20, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
-  statValue:      { fontSize: 18, fontWeight: '700' },
-  statLabel:      { fontSize: 11 },
-
-  sectionLabel:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingLeft: 4 },
-  timelineRow:    { flexDirection: 'row', gap: 12 },
-  timelineLeft:   { alignItems: 'center', width: 14 },
-  timelineDot:    { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-  timelineLine:   { width: 2, flex: 1, marginTop: 4 },
-  timelineContent:{ flex: 1 },
-  timelineEvent:  { fontSize: 14, fontWeight: '500', lineHeight: 20 },
-  timelineTime:   { fontSize: 11, marginTop: 2 },
+  content:         { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 120, gap: 14 },
+  title:           { fontSize: 26, fontWeight: '700' },
+  sub:             { fontSize: 13, marginTop: -8 },
+  pillCard:        { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
+  mapInner:        { padding: 28, alignItems: 'center', gap: 12 },
+  iconWrap:        { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  mapTitle:        { fontSize: 16, fontWeight: '700' },
+  mapSub:          { fontSize: 12, lineHeight: 18 },
+  coordCard:       { width: '100%', borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  coordRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
+  coordDivider:    { height: 1 },
+  coordLabel:      { fontSize: 12 },
+  coordValue:      { fontSize: 14, fontWeight: '600' },
+  mapsBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14 },
+  mapsBtnText:     { color: '#fff', fontSize: 14, fontWeight: '700' },
+  statsRow:        { flexDirection: 'row', gap: 10 },
+  statPill:        { flex: 1, borderRadius: 20, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
+  statValue:       { fontSize: 18, fontWeight: '700' },
+  statLabel:       { fontSize: 11 },
+  sectionLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingLeft: 4 },
+  timelineRow:     { flexDirection: 'row', gap: 12 },
+  timelineLeft:    { alignItems: 'center', width: 14 },
+  timelineDot:     { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineLine:    { width: 2, flex: 1, marginTop: 4 },
+  timelineContent: { flex: 1 },
+  timelineEvent:   { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  timelineTime:    { fontSize: 11, marginTop: 2 },
 });
