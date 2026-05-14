@@ -1,22 +1,34 @@
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { apiFetch } from '../../services/api';
 import { speak } from '../../services/speechService';
 import { vibrateDanger } from '../../services/vibrationService';
+import { useLang } from '../../context/LanguageContext';
 
 const BG     = '#0D0005';
 const DANGER = '#F87171';
 
 export default function EmergencyScreen() {
-  const pulse  = useRef(new Animated.Value(1)).current;
-  const tapCount = useRef(0);
-  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { lang } = useLang();
+  const pulse      = useRef(new Animated.Value(1)).current;
+  const tapCount   = useRef(0);
+  const tapTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [guardianPhone, setGuardianPhone] = useState<string | null>(null);
 
   useEffect(() => {
     vibrateDanger();
+    speak(
+      lang === 'rw'
+        ? 'Impanuka. Kanda rimwe guhamagara umurezi wawe. Shikama guhagarika.'
+        : 'Emergency active. Tap once to call your guardian. Hold to cancel.',
+      true
+    );
 
-    // Voice tells the blind user exactly what to do
-    speak('Emergency active. Tap once to call your guardian. Hold to cancel.', true);
+    // Load real guardian phone from backend
+    apiFetch('/auth/me').then((data: any) => {
+      if (data?.emergency_phone) setGuardianPhone(data.emergency_phone);
+    }).catch(() => {});
 
     Animated.loop(
       Animated.sequence([
@@ -37,12 +49,17 @@ export default function EmergencyScreen() {
   }
 
   function callGuardian() {
-    speak('Calling your guardian now.', true);
-    Linking.openURL('tel:+250711000001');
+    const phone = guardianPhone;
+    if (!phone) {
+      speak(lang === 'rw' ? 'Nimero ntiboneka.' : 'Guardian phone not found.', true);
+      return;
+    }
+    speak(lang === 'rw' ? 'Guhamagara umurezi.' : 'Calling your guardian now.', true);
+    Linking.openURL(`tel:${phone}`);
   }
 
   function cancelEmergency() {
-    speak('Emergency cancelled. Going back.', true);
+    speak(lang === 'rw' ? 'Impanuka ihagaritswe.' : 'Emergency cancelled. Going back.', true);
     router.replace('/(tabs)');
   }
 
@@ -54,9 +71,12 @@ export default function EmergencyScreen() {
       delayLongPress={1500}
       activeOpacity={1}
       accessibilityRole="button"
-      accessibilityLabel="Tap to call guardian. Hold to cancel emergency."
+      accessibilityLabel={
+        lang === 'rw'
+          ? 'Kanda guhamagara umurezi. Shikama guhagarika impanuka.'
+          : 'Tap to call guardian. Hold to cancel emergency.'
+      }
     >
-      {/* Pulsing red ring — visual only */}
       <Animated.View style={[styles.ring, { transform: [{ scale: pulse }] }]} />
       <View style={styles.innerDot} />
     </TouchableOpacity>

@@ -7,7 +7,6 @@ import { useLang } from '../../context/LanguageContext';
 import { setDetectionLanguage } from '../../services/detectionService';
 import { setLanguage } from '../../services/speechService';
 import { apiFetch, saveToken, saveUser } from '../../services/api';
-import { findAccount } from '../../services/accountsService';
 
 const C = G_DARK;
 
@@ -43,16 +42,7 @@ export default function LoginScreen() {
       if (data.user.role === 'guardian') router.replace('/(guardian)');
       else if (data.user.role === 'admin') router.replace('/(admin)');
       else router.replace('/(tabs)');
-      return;
-    } catch (error: any) {
-      const local = await findAccount(phone.trim(), password.trim());
-      if (!error.status && local) {
-        if (local.role === 'guardian') router.replace('/(guardian)');
-        else if (local.role === 'blind') router.replace('/(tabs)');
-        else router.replace('/(admin)');
-        setLoading(false);
-        return;
-      }
+    } catch {
       setError(lang === 'rw' ? 'Nimero cyangwa ijambo banga sibyo.' : 'Wrong phone or password.');
     } finally {
       setLoading(false);
@@ -101,8 +91,8 @@ export default function LoginScreen() {
             <Ionicons name="information-circle-outline" size={14} color={C.muted} />
             <Text style={styles.hintText}>
               {lang === 'rw'
-                ? 'Impumyi: injira ukoresheje nimero yawe na ijambo banga ryashyizweho na murezi wawe.'
-                : 'Blind user: log in with your phone number and the password your guardian set for you.'}
+                ? 'Umurezi: injira ukoresheje nimero yawe na ijambo banga wahinduye.\nImpumyi: injira ukoresheje nimero yawe na imibare 6 y\'imperuka ya nimero yawe.'
+                : 'Guardian: use your phone number and the password you created.\nBlind user: use your phone number and the last 6 digits of your phone number.'}
             </Text>
           </View>
         </View>

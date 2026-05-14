@@ -1,60 +1,56 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { getLocationConsent } from '../../services/locationConsentService';
 import { apiFetch } from '../../services/api';
-
-const FALLBACK_ACTIVITY = [
-  { time: '10:40', event: 'Navigation stopped',          level: 'muted'   },
-  { time: '10:38', event: 'Path clear',                  level: 'safe'    },
-  { time: '10:37', event: 'Moving car — 3m on the left', level: 'danger'  },
-  { time: '10:35', event: 'Path clear',                  level: 'safe'    },
-  { time: '10:34', event: 'Chair — 1.5m ahead',          level: 'warning' },
-  { time: '10:32', event: 'Navigation started',          level: 'safe'    },
-];
+import { getLocationConsent } from '../../services/locationConsentService';
 
 export default function TrackingScreen() {
   const { colors } = useTheme();
 
-  const [consent,   setConsent]   = useState<boolean | null>(null);
-  const [location,  setLocation]  = useState<{ lat: number; lng: number } | null>(null);
-  const [locError,  setLocError]  = useState('');
-  const [loading,   setLoading]   = useState(true);
-  const [activity,  setActivity]  = useState<any[]>(FALLBACK_ACTIVITY);
-  const [session,   setSession]   = useState({ status: 'Safe', duration_minutes: 8, alert_count: 3 });
+  const [trackData,  setTrackData]  = useState<any>(null);
+  const [location,   setLocation]   = useState<{ lat: number; lng: number } | null>(null);
+  const [locError,   setLocError]   = useState('');
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error,      setError]      = useState('');
 
-  useEffect(() => {
-    async function init() {
-      const allowed = await getLocationConsent();
-      setConsent(allowed);
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch('/guardian/tracking');
+      setTrackData(data);
+      setError('');
 
-      apiFetch('/guardian/tracking')
-        .then(data => {
-          if (data.timeline) setActivity(data.timeline);
-          if (data.session)  setSession(data.session);
-        })
-        .catch(() => {});
-
-      if (allowed === true) {
+      const consent = await getLocationConsent();
+      if (consent === true) {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setLocError('Location permission denied on this device.');
-          setLoading(false);
-          return;
-        }
-        try {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-          setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-        } catch {
-          setLocError('Could not get location. Make sure GPS is on.');
+        } else {
+          try {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            setLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+            setLocError('');
+          } catch {
+            setLocError('Could not get location. Make sure GPS is on.');
+          }
         }
       }
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load tracking data.');
+    } finally {
       setLoading(false);
     }
-    init();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
 
   function openInMaps() {
     if (!location) return;
@@ -68,70 +64,88 @@ export default function TrackingScreen() {
     return colors.muted;
   }
 
+  if (loading) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Ionicons name="sync-outline" size={32} color={colors.accent} />
+        <Text style={[styles.loadingText, { color: colors.muted }]}>Loading tracking data...</Text>
+      </View>
+    );
+  }
+
+  const blindName  = trackData?.blind_name  ?? '—';
+  const isScanning = trackData?.is_scanning ?? false;
+  const session    = trackData?.session     ?? { status: 'Offline', duration_minutes: 0, alert_count: 0 };
+  const timeline   = trackData?.timeline    ?? [];
+
+  const scanColor  = isScanning ? colors.safe : colors.muted;
+  const scanLabel  = isScanning ? 'Scanning' : 'Not scanning';
+  const scanIcon   = isScanning ? 'radio' : 'radio-outline';
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
     >
       <Text style={[styles.title, { color: colors.text }]}>Tracking</Text>
-      <Text style={[styles.sub, { color: colors.muted }]}>James Kamau · Active session</Text>
+      <Text style={[styles.sub,   { color: colors.muted }]}>{blindName}</Text>
+
+      {/* Scanning status banner */}
+      <View style={[styles.scanBanner, { backgroundColor: scanColor + '18', borderColor: scanColor + '44' }]}>
+        <Ionicons name={scanIcon as any} size={18} color={scanColor} />
+        <Text style={[styles.scanText, { color: scanColor }]}>
+          {isScanning ? `${blindName} is actively scanning right now` : `${blindName} is not currently scanning`}
+        </Text>
+      </View>
+
+      {error ? (
+        <View style={[styles.errorBox, { backgroundColor: colors.danger + '18', borderColor: colors.danger + '44' }]}>
+          <Ionicons name="cloud-offline-outline" size={16} color={colors.danger} />
+          <Text style={[styles.errorText, { color: colors.danger, flex: 1 }]}>{error}</Text>
+          <TouchableOpacity onPress={load}>
+            <Text style={[{ color: colors.accent, fontWeight: '700', fontSize: 13 }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* Location card */}
-      <View style={[styles.pillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {consent === false && (
-          <View style={styles.mapInner}>
-            <View style={[styles.iconWrap, { backgroundColor: colors.danger + '18' }]}>
-              <Ionicons name="location-outline" size={32} color={colors.danger} />
-            </View>
-            <Text style={[styles.mapTitle, { color: colors.text }]}>Location Sharing Off</Text>
-            <Text style={[styles.mapSub, { color: colors.muted, textAlign: 'center' }]}>
-              The blind user has not allowed location sharing.{'\n'}They can change this in their settings.
-            </Text>
-          </View>
-        )}
-
-        {consent === null && !loading && (
-          <View style={styles.mapInner}>
-            <View style={[styles.iconWrap, { backgroundColor: colors.muted + '18' }]}>
-              <Ionicons name="help-circle-outline" size={32} color={colors.muted} />
-            </View>
-            <Text style={[styles.mapTitle, { color: colors.text }]}>No Consent Given</Text>
-            <Text style={[styles.mapSub, { color: colors.muted, textAlign: 'center' }]}>
-              The blind user has not set a location preference yet.
-            </Text>
-          </View>
-        )}
-
-        {loading && (
-          <View style={styles.mapInner}>
-            <Ionicons name="locate-outline" size={32} color={colors.accent} />
-            <Text style={[styles.mapSub, { color: colors.muted }]}>Getting location...</Text>
-          </View>
-        )}
-
-        {consent === true && !loading && locError !== '' && (
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {locError !== '' && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.warning + '18' }]}>
               <Ionicons name="warning-outline" size={32} color={colors.warning} />
             </View>
             <Text style={[styles.mapTitle, { color: colors.text }]}>Location Unavailable</Text>
-            <Text style={[styles.mapSub, { color: colors.muted, textAlign: 'center' }]}>{locError}</Text>
+            <Text style={[styles.mapSub,   { color: colors.muted, textAlign: 'center' }]}>{locError}</Text>
           </View>
         )}
 
-        {consent === true && !loading && location && (
+        {locError === '' && !location && (
+          <View style={styles.mapInner}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.muted + '18' }]}>
+              <Ionicons name="location-outline" size={32} color={colors.muted} />
+            </View>
+            <Text style={[styles.mapTitle, { color: colors.text }]}>Location Not Shared</Text>
+            <Text style={[styles.mapSub,   { color: colors.muted, textAlign: 'center' }]}>
+              The blind user has not allowed location sharing.
+            </Text>
+          </View>
+        )}
+
+        {location && (
           <View style={styles.mapInner}>
             <View style={[styles.iconWrap, { backgroundColor: colors.safe + '18' }]}>
               <Ionicons name="location" size={32} color={colors.safe} />
             </View>
-            <Text style={[styles.mapTitle, { color: colors.text }]}>Location Sharing On</Text>
+            <Text style={[styles.mapTitle, { color: colors.text }]}>Live Location</Text>
             <View style={[styles.coordCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.coordRow}>
                 <Text style={[styles.coordLabel, { color: colors.muted }]}>Latitude</Text>
                 <Text style={[styles.coordValue, { color: colors.text }]}>{location.lat.toFixed(6)}</Text>
               </View>
-              <View style={[styles.coordDivider, { backgroundColor: colors.border }]} />
+              <View style={[{ height: 1, backgroundColor: colors.border }]} />
               <View style={styles.coordRow}>
                 <Text style={[styles.coordLabel, { color: colors.muted }]}>Longitude</Text>
                 <Text style={[styles.coordValue, { color: colors.text }]}>{location.lng.toFixed(6)}</Text>
@@ -148,9 +162,9 @@ export default function TrackingScreen() {
       {/* Stat pills */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Status',   value: session.status,                        color: colors.safe    },
-          { label: 'Duration', value: `${session.duration_minutes} min`,     color: colors.accent  },
-          { label: 'Alerts',   value: `${session.alert_count}`,              color: colors.warning },
+          { label: 'Status',   value: session.status,                    color: isScanning ? colors.safe : colors.muted },
+          { label: 'Duration', value: `${session.duration_minutes} min`, color: colors.accent  },
+          { label: 'Alerts',   value: `${session.alert_count}`,          color: session.alert_count > 0 ? colors.warning : colors.muted },
         ].map((s, i) => (
           <View key={i} style={[styles.statPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
@@ -161,42 +175,52 @@ export default function TrackingScreen() {
 
       {/* Session timeline */}
       <Text style={[styles.sectionLabel, { color: colors.muted }]}>Session Timeline</Text>
-      <View style={[styles.pillCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={{ padding: 16 }}>
-          {activity.map((item: any, i: number) => {
-            const isLast = i === activity.length - 1;
-            return (
-              <View key={i} style={styles.timelineRow}>
-                <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineDot, { backgroundColor: dc(item.level) }]} />
-                  {!isLast && <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {timeline.length === 0 ? (
+          <View style={styles.emptyInner}>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>No activity yet.</Text>
+          </View>
+        ) : (
+          <View style={{ padding: 16 }}>
+            {timeline.map((item: any, i: number) => {
+              const isLast = i === timeline.length - 1;
+              return (
+                <View key={i} style={styles.timelineRow}>
+                  <View style={styles.timelineLeft}>
+                    <View style={[styles.timelineDot, { backgroundColor: dc(item.level) }]} />
+                    {!isLast && <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />}
+                  </View>
+                  <View style={[styles.timelineContent, !isLast && { paddingBottom: 18 }]}>
+                    <Text style={[styles.timelineEvent, { color: colors.text }]}>{item.event}</Text>
+                    <Text style={[styles.timelineTime,  { color: colors.muted }]}>{item.time}</Text>
+                  </View>
                 </View>
-                <View style={[styles.timelineContent, !isLast && { paddingBottom: 18 }]}>
-                  <Text style={[styles.timelineEvent, { color: colors.text }]}>{item.event}</Text>
-                  <Text style={[styles.timelineTime,  { color: colors.muted }]}>{item.time}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        )}
       </View>
-
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  center:          { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },
+  loadingText:     { fontSize: 14, marginTop: 8 },
   content:         { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 120, gap: 14 },
   title:           { fontSize: 26, fontWeight: '700' },
   sub:             { fontSize: 13, marginTop: -8 },
-  pillCard:        { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
+  scanBanner:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 16, borderWidth: 1 },
+  scanText:        { fontSize: 13, fontWeight: '600', flex: 1 },
+  errorBox:        { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  errorText:       { fontSize: 13 },
+  card:            { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
   mapInner:        { padding: 28, alignItems: 'center', gap: 12 },
   iconWrap:        { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   mapTitle:        { fontSize: 16, fontWeight: '700' },
   mapSub:          { fontSize: 12, lineHeight: 18 },
   coordCard:       { width: '100%', borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   coordRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
-  coordDivider:    { height: 1 },
   coordLabel:      { fontSize: 12 },
   coordValue:      { fontSize: 14, fontWeight: '600' },
   mapsBtn:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14 },
@@ -206,6 +230,8 @@ const styles = StyleSheet.create({
   statValue:       { fontSize: 18, fontWeight: '700' },
   statLabel:       { fontSize: 11 },
   sectionLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingLeft: 4 },
+  emptyInner:      { padding: 24, alignItems: 'center' },
+  emptyText:       { fontSize: 13 },
   timelineRow:     { flexDirection: 'row', gap: 12 },
   timelineLeft:    { alignItems: 'center', width: 14 },
   timelineDot:     { width: 10, height: 10, borderRadius: 5, marginTop: 4 },

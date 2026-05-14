@@ -9,26 +9,24 @@ const C = G_DARK;
 
 export default function GuardianRegisterScreen() {
   const { t } = useLang();
-  const [guardianName, setGuardianName] = useState('');
-  const [phone, setPhone]               = useState('');
-  const [password, setPassword]         = useState('');
-  const [blindUserName, setBlindUserName] = useState('');
+  const [name,         setName]         = useState('');
+  const [phone,        setPhone]        = useState('');
+  const [password,     setPassword]     = useState('');
   const [relationship, setRelationship] = useState('');
-  const [showPass, setShowPass]         = useState(false);
+  const [showPass,     setShowPass]     = useState(false);
 
-  const isValid = guardianName.trim() && phone.trim() && password.trim() && blindUserName.trim();
+  const isValid = name.trim().length >= 2
+    && phone.trim().length >= 9
+    && password.trim().length >= 6;
 
   function handleNext() {
     if (!isValid) return;
-    // Pass guardian data + blind user name to the next screen via params.
-    // The actual API call happens at the end of blind-register.
     router.push({
       pathname: '/(auth)/blind-register',
       params: {
-        guardianName:  guardianName.trim(),
-        guardianPhone: phone.trim(),
+        guardianName:  name.trim(),
+        guardianPhone: phone.trim().replace(/\s/g, ''),
         password:      password.trim(),
-        blindUserName: blindUserName.trim(),
         relationship:  relationship.trim(),
       },
     });
@@ -37,38 +35,37 @@ export default function GuardianRegisterScreen() {
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-        <Text style={[styles.backText, { color: C.accent }]}>← {t('back')}</Text>
+        <Text style={styles.backText}>← {t('back')}</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.title, { color: C.text }]}>{t('createAccount')}</Text>
-      <Text style={[styles.subtitle, { color: C.muted }]}>{t('personGuiding')}</Text>
+      <Text style={styles.title}>{t('createAccount')}</Text>
+      <Text style={styles.subtitle}>{t('personGuiding')}</Text>
 
-      {/* Guardian details */}
-      <Text style={[styles.sectionLabel, { color: C.muted }]}>{t('yourDetails')}</Text>
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: C.muted }]}>{t('yourFullName')}</Text>
+      <View style={styles.form}>
+        <Text style={styles.label}>{t('yourFullName')}</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. Sarah Kamau"
           placeholderTextColor={C.muted}
-          value={guardianName}
-          onChangeText={setGuardianName}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
         />
 
-        <Text style={[styles.label, { color: C.muted }]}>{t('yourPhone')}</Text>
+        <Text style={styles.label}>{t('yourPhone')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="+250 700 000 000"
+          placeholder="+250 780 000 000"
           placeholderTextColor={C.muted}
           keyboardType="phone-pad"
           value={phone}
           onChangeText={setPhone}
         />
 
-        <Text style={[styles.label, { color: C.muted }]}>{t('password')}</Text>
+        <Text style={styles.label}>{t('password')}</Text>
         <View style={styles.passwordWrap}>
           <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
+            style={styles.passwordInput}
             placeholder={t('createPassword')}
             placeholderTextColor={C.muted}
             secureTextEntry={!showPass}
@@ -79,39 +76,20 @@ export default function GuardianRegisterScreen() {
             <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={C.muted} />
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={[styles.dividerLine, { backgroundColor: C.border }]} />
-        <Text style={[styles.dividerText, { color: C.muted }]}>{t('personGuiding')}</Text>
-        <View style={[styles.dividerLine, { backgroundColor: C.border }]} />
-      </View>
-
-      {/* Blind user details */}
-      <Text style={[styles.sectionLabel, { color: C.muted }]}>{t('blindUserDetails')}</Text>
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: C.muted }]}>{t('theirName')}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. James Kamau"
-          placeholderTextColor={C.muted}
-          value={blindUserName}
-          onChangeText={setBlindUserName}
-        />
-
-        <Text style={[styles.label, { color: C.muted }]}>{t('relationship')}</Text>
+        <Text style={styles.label}>{t('relationship')}</Text>
         <TextInput
           style={styles.input}
           placeholder={t('relationshipHint')}
           placeholderTextColor={C.muted}
           value={relationship}
           onChangeText={setRelationship}
+          autoCapitalize="words"
         />
       </View>
 
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: C.accent }, !isValid && styles.buttonDisabled]}
+        style={[styles.button, !isValid && styles.buttonDisabled]}
         onPress={handleNext}
         disabled={!isValid}
       >
@@ -123,20 +101,17 @@ export default function GuardianRegisterScreen() {
 
 const styles = StyleSheet.create({
   screen:       { flexGrow: 1, backgroundColor: C.background, padding: 28, paddingTop: 60, paddingBottom: 40 },
-  back:         { marginBottom: 16 },
-  backText:     { fontSize: 15 },
-  title:        { fontSize: 28, fontWeight: '700', marginBottom: 6 },
-  subtitle:     { fontSize: 14, lineHeight: 22, marginBottom: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8, marginTop: 8 },
-  section:      { gap: 4, marginBottom: 8 },
-  label:        { fontSize: 13, marginBottom: 4 },
-  input:        { backgroundColor: C.card, borderRadius: 12, padding: 16, color: C.text, fontSize: 16, borderWidth: 1, borderColor: C.border, marginBottom: 14 },
-  passwordWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, marginBottom: 14, paddingRight: 12 },
+  back:         { marginBottom: 20 },
+  backText:     { color: C.accent, fontSize: 15 },
+  title:        { color: C.text, fontSize: 28, fontWeight: '700', marginBottom: 6 },
+  subtitle:     { color: C.muted, fontSize: 14, lineHeight: 22, marginBottom: 24 },
+  form:         { gap: 4 },
+  label:        { color: C.muted, fontSize: 13, marginBottom: 4, marginTop: 10 },
+  input:        { backgroundColor: C.card, borderRadius: 12, padding: 16, color: C.text, fontSize: 16, borderWidth: 1, borderColor: C.border },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingRight: 12 },
+  passwordInput:{ flex: 1, padding: 16, color: C.text, fontSize: 16 },
   eyeBtn:       { padding: 8 },
-  divider:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
-  dividerLine:  { flex: 1, height: 1 },
-  dividerText:  { fontSize: 12 },
-  button:       { borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
+  button:       { backgroundColor: C.accent, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },
   buttonDisabled: { opacity: 0.4 },
   buttonText:   { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

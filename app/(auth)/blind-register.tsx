@@ -25,30 +25,25 @@ export default function BlindRegisterScreen() {
     guardianName  = '',
     guardianPhone = '',
     password      = '',
-    blindUserName = '',
     relationship  = '',
   } = useLocalSearchParams<{
     guardianName:  string;
     guardianPhone: string;
     password:      string;
-    blindUserName: string;
     relationship:  string;
   }>();
 
-  const [blindName,      setBlindName]      = useState(blindUserName);
-  const [blindPhone,     setBlindPhone]      = useState('');
-  const [blindPassword,  setBlindPassword]   = useState('');
-  const [showPass,       setShowPass]        = useState(false);
-  const [emergency,      setEmergency]       = useState('');
-  const [lang,           setLangLocal]       = useState<Lang>('en');
-  const [speed,          setSpeed]           = useState('Normal');
-  const [locationAllowed, setLocationAllowed] = useState<boolean | null>(null);
-  const [loading,        setLoading]         = useState(false);
-  const [error,          setError]           = useState('');
+  const [blindName,       setBlindName]       = useState('');
+  const [blindPhone,      setBlindPhone]       = useState('');
+  const [lang,            setLangLocal]        = useState<Lang>('en');
+  const [speed,           setSpeed]            = useState('Normal');
+  const [locationAllowed, setLocationAllowed]  = useState<boolean | null>(null);
+  const [loading,         setLoading]          = useState(false);
+  const [error,           setError]            = useState('');
 
   const canSubmit = locationAllowed !== null
-    && blindPhone.trim().length >= 6
-    && blindPassword.trim().length >= 4
+    && blindName.trim().length >= 2
+    && blindPhone.trim().length >= 9
     && !loading;
 
   async function handleDone() {
@@ -61,31 +56,27 @@ export default function BlindRegisterScreen() {
         body: JSON.stringify({
           guardian: {
             name:         guardianName.trim(),
-            phone:        guardianPhone.replace(/\s/g, ''),
+            phone:        guardianPhone,
             password:     password,
-            relationship: relationship.trim(),
-            language:     lang,
-            voice_speed:  speed,
+            relationship: relationship.trim() || 'Guardian',
           },
           blind_user: {
-            name:             blindName.trim(),
-            phone:            blindPhone.trim().replace(/\s/g, ''),
-            password:         blindPassword.trim(),
-            emergency_phone:  emergency.trim(),
-            language:         lang,
-            voice_speed:      speed,
-            location_allowed: locationAllowed,
+            name:        blindName.trim(),
+            phone:       blindPhone.trim().replace(/\s/g, ''),
+            language:    lang,
+            voice_speed: speed,
           },
         }),
       });
 
       await saveLocationConsent(locationAllowed!);
+      await saveToken(data.token);
+      await saveUser(data.guardian);
       setLang(lang);
       setLanguage(lang);
       setDetectionLanguage(lang);
 
-      // Redirect to login instead of auto-logging in
-      router.replace('/(auth)/login');
+      router.replace('/(guardian)');
     } catch (e: any) {
       setError(e.message ?? 'Registration failed. Please try again.');
     } finally {
@@ -102,8 +93,17 @@ export default function BlindRegisterScreen() {
       <Text style={styles.title}>{t('registerBlind')}</Text>
       <Text style={styles.subtitle}>{t('registeringFor')}</Text>
 
-      <View style={styles.form}>
+      {/* Guardian is the emergency contact — info banner */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={C.accent} />
+        <Text style={styles.infoText}>
+          {lang === 'rw'
+            ? `Nimero ya ${guardianName || 'umurezi'} izakoreshwa nk'uwahamagarwa mu bihe bikomeye.`
+            : `${guardianName || 'Guardian'}'s number will be used as the emergency contact.`}
+        </Text>
+      </View>
 
+      <View style={styles.form}>
         <Text style={styles.label}>{t('theirName')}</Text>
         <TextInput
           style={styles.input}
@@ -111,6 +111,7 @@ export default function BlindRegisterScreen() {
           placeholderTextColor={C.muted}
           value={blindName}
           onChangeText={setBlindName}
+          autoCapitalize="words"
         />
 
         <Text style={styles.label}>
@@ -118,44 +119,21 @@ export default function BlindRegisterScreen() {
         </Text>
         <TextInput
           style={styles.input}
-          placeholder="+250 700 000 000"
+          placeholder="+250 780 000 000"
           placeholderTextColor={C.muted}
           keyboardType="phone-pad"
           value={blindPhone}
           onChangeText={setBlindPhone}
         />
 
-        <Text style={styles.label}>
-          {lang === 'rw' ? "Ijambo banga ry'impumyi (nibura inyuguti 4)" : 'Blind user password (min. 4 characters)'}
-        </Text>
-        <Text style={[styles.note, { color: C.muted }]}>
-          {lang === 'rw'
-            ? 'Bwira impumyi ijambo banga nyuma yo gusoza.'
-            : 'Tell the blind user this password so they can log in.'}
-        </Text>
-        <View style={styles.passwordWrap}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder={lang === 'rw' ? 'Shiraho ijambo banga' : 'Create a password for them'}
-            placeholderTextColor={C.muted}
-            secureTextEntry={!showPass}
-            value={blindPassword}
-            onChangeText={setBlindPassword}
-          />
-          <TouchableOpacity onPress={() => setShowPass(p => !p)} style={styles.eyeBtn}>
-            <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={C.muted} />
-          </TouchableOpacity>
+        <View style={styles.passwordNote}>
+          <Ionicons name="information-circle-outline" size={14} color={C.muted} />
+          <Text style={styles.passwordNoteText}>
+            {lang === 'rw'
+              ? 'Ijambo banga ry\'impumyi ni imibare 6 y\'imperuka ya nimero yabo ya telefoni.'
+              : 'The blind user\'s password will be the last 6 digits of their phone number.'}
+          </Text>
         </View>
-
-        <Text style={styles.label}>{t('emergencyContact')}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={t('emergencyPhone')}
-          placeholderTextColor={C.muted}
-          keyboardType="phone-pad"
-          value={emergency}
-          onChangeText={setEmergency}
-        />
 
         <Text style={styles.label}>{t('preferredLang')}</Text>
         <View style={styles.chips}>
@@ -187,11 +165,6 @@ export default function BlindRegisterScreen() {
         <Text style={styles.label}>
           {lang === 'rw' ? 'Emera ko umurezi abona aho uri' : 'Allow guardian to see your location?'}
         </Text>
-        <Text style={[styles.note, { color: C.muted }]}>
-          {lang === 'rw'
-            ? "Iyi ni amahitamo y'impumyi. Bashobora guhindura ibi igihe icyo aricyo cyose."
-            : "This is the blind user's choice. They can change it anytime."}
-        </Text>
         <View style={styles.chips}>
           <TouchableOpacity
             style={[styles.chip, locationAllowed === true && styles.chipActive]}
@@ -202,7 +175,7 @@ export default function BlindRegisterScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.chip, locationAllowed === false && { backgroundColor: C.danger, borderColor: C.danger }]}
+            style={[styles.chip, locationAllowed === false && styles.chipDeny]}
             onPress={() => setLocationAllowed(false)}
           >
             <Text style={[styles.chipText, locationAllowed === false && styles.chipTextActive]}>
@@ -212,13 +185,12 @@ export default function BlindRegisterScreen() {
         </View>
 
         {locationAllowed === null && (
-          <Text style={[styles.warn, { color: C.danger }]}>
+          <Text style={styles.warn}>
             {lang === 'rw' ? 'Hitamo imwe' : 'Please make a choice to continue'}
           </Text>
         )}
 
-        {error ? <Text style={[styles.warn, { color: C.danger, marginTop: 8 }]}>{error}</Text> : null}
-
+        {error ? <Text style={[styles.warn, { marginTop: 8 }]}>{error}</Text> : null}
       </View>
 
       <TouchableOpacity
@@ -233,26 +205,27 @@ export default function BlindRegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen:        { flexGrow: 1, backgroundColor: C.background, padding: 28, paddingTop: 60, paddingBottom: 40 },
-  back:          { marginBottom: 16 },
-  backText:      { color: C.accent, fontSize: 15 },
-  title:         { color: C.text, fontSize: 28, fontWeight: '700', marginBottom: 6 },
-  subtitle:      { color: C.muted, fontSize: 14, lineHeight: 22, marginBottom: 24 },
-  form:          { gap: 4 },
-  label:         { color: C.muted, fontSize: 13, marginBottom: 4, marginTop: 8 },
-  note:          { fontSize: 12, lineHeight: 18, marginBottom: 6, marginTop: -2 },
-  warn:          { fontSize: 12, marginTop: 4 },
-  input:         { backgroundColor: C.card, borderRadius: 12, padding: 16, color: C.text, fontSize: 16, borderWidth: 1, borderColor: C.border, marginBottom: 4 },
-  passwordWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, marginBottom: 4, paddingRight: 12 },
-  passwordInput: { flex: 1, padding: 16, color: C.text, fontSize: 16 },
-  eyeBtn:        { padding: 8 },
-  chips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  chip:          { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  chipActive:    { backgroundColor: C.accent, borderColor: C.accent },
-  chipFlag:      { fontSize: 16 },
-  chipText:      { color: C.muted, fontSize: 14 },
-  chipTextActive:{ color: '#fff', fontWeight: '600' },
-  button:        { backgroundColor: C.accent, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 24 },
-  buttonDisabled:{ opacity: 0.4 },
-  buttonText:    { color: '#fff', fontSize: 16, fontWeight: '600' },
+  screen:           { flexGrow: 1, backgroundColor: C.background, padding: 28, paddingTop: 60, paddingBottom: 40 },
+  back:             { marginBottom: 16 },
+  backText:         { color: C.accent, fontSize: 15 },
+  title:            { color: C.text, fontSize: 28, fontWeight: '700', marginBottom: 6 },
+  subtitle:         { color: C.muted, fontSize: 14, lineHeight: 22, marginBottom: 16 },
+  infoBanner:       { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: C.accent + '18', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.accent + '40', marginBottom: 16 },
+  infoText:         { color: C.text, fontSize: 12, lineHeight: 18, flex: 1 },
+  form:             { gap: 4 },
+  label:            { color: C.muted, fontSize: 13, marginBottom: 4, marginTop: 10 },
+  input:            { backgroundColor: C.card, borderRadius: 12, padding: 16, color: C.text, fontSize: 16, borderWidth: 1, borderColor: C.border },
+  passwordNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 10, marginTop: 6 },
+  passwordNoteText: { color: C.muted, fontSize: 12, lineHeight: 17, flex: 1 },
+  warn:             { color: '#F87171', fontSize: 12, marginTop: 4 },
+  chips:            { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  chip:             { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  chipActive:       { backgroundColor: C.accent, borderColor: C.accent },
+  chipDeny:         { backgroundColor: '#EF4444', borderColor: '#EF4444' },
+  chipFlag:         { fontSize: 16 },
+  chipText:         { color: C.muted, fontSize: 14 },
+  chipTextActive:   { color: '#fff', fontWeight: '600' },
+  button:           { backgroundColor: C.accent, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 28 },
+  buttonDisabled:   { opacity: 0.4 },
+  buttonText:       { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
