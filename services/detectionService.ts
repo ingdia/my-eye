@@ -74,10 +74,7 @@ export async function detectFromFrame(imageUri: string): Promise<DetectionResult
     const res = await fetch(`${API_BASE}/detect`, {
       method:  'POST',
       signal:  controller.signal,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
     });
 

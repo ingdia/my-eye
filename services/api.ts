@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE = 'http://192.168.1.2:8000';
+export const API_BASE = 'http://192.168.0.104:8000';
 
 const TOKEN_KEY = '@emboni_token';
 const USER_KEY  = '@emboni_user';
